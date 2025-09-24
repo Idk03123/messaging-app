@@ -162,6 +162,7 @@
         let myProfileDocRef = null;
         let currentChatContact = null;
         let unsubscribeFromMessages = null;
+        let listenersAttached = false; // New flag to prevent duplicate listeners
 
         // Show a modal message
         function showModal(title, text, showCloseButton = false) {
@@ -248,71 +249,6 @@
             }, 1000);
         }
 
-        // Handle number change button click
-        changeNumberBtn.addEventListener('click', async () => {
-            if (changeNumberBtn.disabled) return;
-            showModal("Changing Number", "Generating a new 16-digit code for you...");
-            const newNumber = generateRandomNumber();
-            try {
-                await setDoc(myProfileDocRef, {
-                    phoneNumber: newNumber,
-                    userId: userId,
-                    lastChanged: serverTimestamp(),
-                }, { merge: true });
-                myPhoneNumber = newNumber;
-                myNumberElem.textContent = myPhoneNumber;
-                changeNumberBtn.disabled = true;
-                updateChangeTimer(48 * 60 * 60);
-                hideModal();
-                showModal("Success", "Your number has been changed!", true);
-            } catch (error) {
-                console.error("Error changing number:", error);
-                showModal("Error", "Failed to change number. See console.", true);
-            }
-        });
-
-        // Add a contact
-        addContactBtn.addEventListener('click', async () => {
-            const contactNumber = addContactInput.value.trim();
-            if (contactNumber.length !== 16 || isNaN(contactNumber)) {
-                showModal("Invalid Number", "Please enter a valid 16-digit number.", true);
-                return;
-            }
-            if (contactNumber === myPhoneNumber) {
-                showModal("Whoops", "You can't add yourself as a contact!", true);
-                return;
-            }
-
-            // Find the user with this number
-            showModal("Adding Contact", "Searching for the user...");
-            try {
-                const q = query(collection(db, `artifacts/${appId}/users`), where("phoneNumber", "==", contactNumber));
-                const querySnapshot = await getDocs(q);
-                if (querySnapshot.empty) {
-                    showModal("Not Found", "No user found with that number. Please check the number and try again.", true);
-                    return;
-                }
-                const contactData = querySnapshot.docs[0].data();
-                const contactId = contactData.userId;
-
-                // Add to my contacts
-                const contactDocRef = doc(db, `artifacts/${appId}/users/${userId}/contacts`, contactId);
-                await setDoc(contactDocRef, {
-                    name: `Contact (${contactNumber})`,
-                    phoneNumber: contactNumber,
-                    contactId: contactId,
-                    addedAt: serverTimestamp(),
-                });
-
-                addContactInput.value = '';
-                hideModal();
-                showModal("Success", `Contact with number ${contactNumber} added!`, true);
-            } catch (error) {
-                console.error("Error adding contact:", error);
-                showModal("Error", "Failed to add contact. See console.", true);
-            }
-        });
-
         // Start a conversation
         function startChat(contact) {
             if (unsubscribeFromMessages) {
@@ -358,36 +294,7 @@
                 showModal("Error", "Failed to load chat messages.", true);
             });
         }
-
-        // Send a message
-        sendBtn.addEventListener('click', async () => {
-            const message = messageInput.value.trim();
-            if (!message || !currentChatContact) return;
-
-            const chatRoomId = [userId, currentChatContact.contactId].sort().join('_');
-            const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/chats/${chatRoomId}/messages`);
-
-            try {
-                await addDoc(messagesCollectionRef, {
-                    text: message,
-                    senderId: userId,
-                    timestamp: serverTimestamp(),
-                });
-                messageInput.value = '';
-            } catch (error) {
-                console.error("Error sending message:", error);
-                showModal("Error", "Failed to send message.", true);
-            }
-        });
-
-        // Event listener for Enter key on message input
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault(); // Prevents new line
-                sendBtn.click();
-            }
-        });
-
+        
         // --- Main App Initialization ---
         async function initializeAppAndAuth() {
             showModal("Initializing...", "Setting up Firebase and authenticating user.");
@@ -433,6 +340,106 @@
                             console.error("Error listening to contacts:", error);
                             showModal("Error", "Failed to load contacts.", true);
                         });
+
+                        // Only attach event listeners once everything is ready
+                        if (!listenersAttached) {
+                            // Handle number change button click
+                            changeNumberBtn.addEventListener('click', async () => {
+                                if (changeNumberBtn.disabled) return;
+                                showModal("Changing Number", "Generating a new 16-digit code for you...");
+                                const newNumber = generateRandomNumber();
+                                try {
+                                    await setDoc(myProfileDocRef, {
+                                        phoneNumber: newNumber,
+                                        userId: userId,
+                                        lastChanged: serverTimestamp(),
+                                    }, { merge: true });
+                                    myPhoneNumber = newNumber;
+                                    myNumberElem.textContent = myPhoneNumber;
+                                    changeNumberBtn.disabled = true;
+                                    updateChangeTimer(48 * 60 * 60);
+                                    hideModal();
+                                    showModal("Success", "Your number has been changed!", true);
+                                } catch (error) {
+                                    console.error("Error changing number:", error);
+                                    showModal("Error", "Failed to change number. See console.", true);
+                                }
+                            });
+
+                            // Add a contact
+                            addContactBtn.addEventListener('click', async () => {
+                                const contactNumber = addContactInput.value.trim();
+                                if (contactNumber.length !== 16 || isNaN(contactNumber)) {
+                                    showModal("Invalid Number", "Please enter a valid 16-digit number.", true);
+                                    return;
+                                }
+                                if (contactNumber === myPhoneNumber) {
+                                    showModal("Whoops", "You can't add yourself as a contact!", true);
+                                    return;
+                                }
+
+                                // Find the user with this number
+                                showModal("Adding Contact", "Searching for the user...");
+                                try {
+                                    const q = query(collection(db, `artifacts/${appId}/users`), where("phoneNumber", "==", contactNumber));
+                                    const querySnapshot = await getDocs(q);
+                                    if (querySnapshot.empty) {
+                                        showModal("Not Found", "No user found with that number. Please check the number and try again.", true);
+                                        return;
+                                    }
+                                    const contactData = querySnapshot.docs[0].data();
+                                    const contactId = contactData.userId;
+
+                                    // Add to my contacts
+                                    const contactDocRef = doc(db, `artifacts/${appId}/users/${userId}/contacts`, contactId);
+                                    await setDoc(contactDocRef, {
+                                        name: `Contact (${contactNumber})`,
+                                        phoneNumber: contactNumber,
+                                        contactId: contactId,
+                                        addedAt: serverTimestamp(),
+                                    });
+
+                                    addContactInput.value = '';
+                                    hideModal();
+                                    showModal("Success", `Contact with number ${contactNumber} added!`, true);
+                                } catch (error) {
+                                    console.error("Error adding contact:", error);
+                                    showModal("Error", "Failed to add contact. See console.", true);
+                                }
+                            });
+                            
+                            // Send a message
+                            sendBtn.addEventListener('click', async () => {
+                                const message = messageInput.value.trim();
+                                if (!message || !currentChatContact) return;
+
+                                const chatRoomId = [userId, currentChatContact.contactId].sort().join('_');
+                                const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/chats/${chatRoomId}/messages`);
+
+                                try {
+                                    await addDoc(messagesCollectionRef, {
+                                        text: message,
+                                        senderId: userId,
+                                        timestamp: serverTimestamp(),
+                                    });
+                                    messageInput.value = '';
+                                } catch (error) {
+                                    console.error("Error sending message:", error);
+                                    showModal("Error", "Failed to send message.", true);
+                                }
+                            });
+
+                            // Event listener for Enter key on message input
+                            messageInput.addEventListener('keydown', (e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault(); // Prevents new line
+                                    sendBtn.click();
+                                }
+                            });
+
+                            listenersAttached = true;
+                        }
+
                     } else {
                         // Not authenticated, sign in
                         if (initialAuthToken) {
