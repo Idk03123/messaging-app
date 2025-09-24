@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Canvas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .chat-bubble-sent {
+            background-color: #3b82f6;
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+        .chat-bubble-received {
+            background-color: #e5e7eb;
+            color: #1f2937;
+            border-bottom-left-radius: 0;
+        }
+        /* Custom scrollbar for chat area */
+        .chat-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-area::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .chat-area::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        .chat-area::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+
+    <!-- Loading and Error Message Modal -->
+    <div id="modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-sm mx-auto text-center">
+            <h3 id="modal-title" class="text-xl font-semibold mb-2">Loading...</h3>
+            <p id="modal-text" class="text-gray-600"></p>
+            <button id="modal-close" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors hidden">Close</button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" class="bg-white rounded-2xl shadow-xl w-full max-w-4xl flex flex-col lg:flex-row h-[90vh] overflow-hidden">
+
+        <!-- Sidebar for User Info and Contacts -->
+        <div class="w-full lg:w-1/3 bg-gray-50 p-6 flex flex-col border-r border-gray-200">
+            <h1 class="text-2xl font-bold text-gray-800 mb-6 text-center lg:text-left">Chat Canvas</h1>
+
+            <!-- User ID and Phone Number -->
+            <div class="bg-gray-200 p-4 rounded-xl mb-6">
+                <p class="text-gray-600 text-sm font-medium mb-1">Your ID:</p>
+                <p id="user-id" class="text-xs break-all mb-2 font-mono text-gray-800"></p>
+                <p class="text-gray-600 text-sm font-medium mb-1">Your Number:</p>
+                <div class="flex items-center justify-between">
+                    <p id="my-number" class="text-lg font-bold text-blue-600 tracking-wider"></p>
+                    <button id="change-number-btn" class="bg-blue-500 text-white text-sm font-medium py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">Change</button>
+                </div>
+                <p id="change-timer" class="text-xs text-gray-500 mt-2"></p>
+            </div>
+
+            <!-- Add Contact Section -->
+            <div class="flex flex-col mb-4">
+                <label for="contact-number" class="text-sm font-medium text-gray-700 mb-2">Add Contact by Number</label>
+                <div class="flex space-x-2">
+                    <input type="text" id="contact-number-input" placeholder="Enter 16-digit number" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow text-sm">
+                    <button id="add-contact-btn" class="bg-gray-300 text-gray-700 font-medium p-2 rounded-lg hover:bg-gray-400 transition-colors">Add</button>
+                </div>
+            </div>
+
+            <!-- Contacts List -->
+            <div class="flex-grow overflow-y-auto space-y-2 pr-2">
+                <h3 class="text-lg font-semibold text-gray-800 sticky top-0 bg-gray-50 pb-2">Contacts</h3>
+                <div id="contacts-list" class="space-y-2">
+                    <!-- Contacts will be dynamically added here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="w-full lg:w-2/3 flex flex-col bg-white">
+            <!-- Chat Header -->
+            <div id="chat-header" class="bg-gray-200 p-4 text-center rounded-tr-2xl hidden">
+                <h2 id="chat-with-name" class="text-lg font-semibold text-gray-800">Select a contact to chat</h2>
+                <p id="chat-with-number" class="text-sm text-gray-600"></p>
+            </div>
+            
+            <!-- Welcome message -->
+            <div id="welcome-message" class="flex-grow flex items-center justify-center p-4 text-center text-gray-400">
+                <p>Select a contact to start a conversation.</p>
+            </div>
+
+            <!-- Message Area -->
+            <div id="messages-container" class="flex-grow overflow-y-auto p-4 space-y-4 chat-area hidden">
+                <!-- Messages will be dynamically added here -->
+            </div>
+
+            <!-- Message Input -->
+            <div id="message-input-area" class="p-4 border-t border-gray-200 hidden">
+                <div class="flex items-center space-x-2">
+                    <input type="text" id="message-input" placeholder="Type a message..." class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow text-sm">
+                    <button id="send-btn" class="bg-blue-500 text-white font-medium p-3 rounded-lg hover:bg-blue-600 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                            <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, addDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // IMPORTANT: Global variables for Firebase configuration. DO NOT EDIT.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- UI Element References ---
+        const userIdElem = document.getElementById('user-id');
+        const myNumberElem = document.getElementById('my-number');
+        const changeNumberBtn = document.getElementById('change-number-btn');
+        const changeTimerElem = document.getElementById('change-timer');
+        const addContactInput = document.getElementById('contact-number-input');
+        const addContactBtn = document.getElementById('add-contact-btn');
+        const contactsListElem = document.getElementById('contacts-list');
+        const messagesContainer = document.getElementById('messages-container');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatHeader = document.getElementById('chat-header');
+        const chatWithNameElem = document.getElementById('chat-with-name');
+        const chatWithNumberElem = document.getElementById('chat-with-number');
+        const welcomeMessageElem = document.getElementById('welcome-message');
+        const messageInputArea = document.getElementById('message-input-area');
+
+        // Modal
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalText = document.getElementById('modal-text');
+        const modalCloseBtn = document.getElementById('modal-close');
+
+        // --- Firebase Globals ---
+        let app;
+        let auth;
+        let db;
+        let userId = null;
+        let myPhoneNumber = null;
+        let myProfileDocRef = null;
+        let currentChatContact = null;
+        let unsubscribeFromMessages = null;
+
+        // Show a modal message
+        function showModal(title, text, showCloseButton = false) {
+            modalTitle.textContent = title;
+            modalText.textContent = text;
+            modalCloseBtn.style.display = showCloseButton ? 'block' : 'none';
+            modal.classList.remove('hidden');
+        }
+
+        // Hide the modal
+        function hideModal() {
+            modal.classList.add('hidden');
+        }
+
+        modalCloseBtn.addEventListener('click', hideModal);
+
+        // Utility function to generate a 16-digit random number string
+        function generateRandomNumber() {
+            let num = '';
+            for (let i = 0; i < 16; i++) {
+                num += Math.floor(Math.random() * 10);
+            }
+            return num;
+        }
+
+        // Get or create the user's phone number
+        async function getOrCreatePhoneNumber() {
+            try {
+                showModal("Connecting...", "Fetching your profile and unique number.");
+                const docSnap = await getDoc(myProfileDocRef);
+                const now = new Date();
+                let needsUpdate = false;
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    myPhoneNumber = data.phoneNumber;
+                    const lastChanged = data.lastChanged?.toDate();
+
+                    // Check if it's been less than 48 hours since last change
+                    const timeDiffHours = (now - lastChanged) / (1000 * 60 * 60);
+                    if (timeDiffHours < 48) {
+                        changeNumberBtn.disabled = true;
+                        updateChangeTimer(48 * 60 * 60 - (now - lastChanged) / 1000);
+                        return;
+                    }
+                } else {
+                    // Create new profile with a phone number
+                    myPhoneNumber = generateRandomNumber();
+                    await setDoc(myProfileDocRef, {
+                        phoneNumber: myPhoneNumber,
+                        userId: userId,
+                        lastChanged: serverTimestamp(),
+                    });
+                    console.log("New user profile created with phone number.");
+                }
+
+                // Update UI with the number
+                myNumberElem.textContent = myPhoneNumber;
+                changeNumberBtn.disabled = false;
+                changeTimerElem.textContent = "";
+
+            } catch (error) {
+                console.error("Error getting/creating phone number:", error);
+                showModal("Error", "Could not load your profile. Please check the console for details.", true);
+            } finally {
+                hideModal();
+            }
+        }
+
+        // Update the change timer display
+        function updateChangeTimer(secondsLeft) {
+            const timerInterval = setInterval(() => {
+                secondsLeft--;
+                if (secondsLeft <= 0) {
+                    clearInterval(timerInterval);
+                    changeNumberBtn.disabled = false;
+                    changeTimerElem.textContent = "You can now change your number.";
+                    return;
+                }
+                const hours = Math.floor(secondsLeft / 3600);
+                const minutes = Math.floor((secondsLeft % 3600) / 60);
+                const seconds = Math.floor(secondsLeft % 60);
+                changeTimerElem.textContent = `Change available in ${hours}h ${minutes}m ${seconds}s`;
+            }, 1000);
+        }
+
+        // Handle number change button click
+        changeNumberBtn.addEventListener('click', async () => {
+            if (changeNumberBtn.disabled) return;
+            showModal("Changing Number", "Generating a new 16-digit code for you...");
+            const newNumber = generateRandomNumber();
+            try {
+                await setDoc(myProfileDocRef, {
+                    phoneNumber: newNumber,
+                    userId: userId,
+                    lastChanged: serverTimestamp(),
+                }, { merge: true });
+                myPhoneNumber = newNumber;
+                myNumberElem.textContent = myPhoneNumber;
+                changeNumberBtn.disabled = true;
+                updateChangeTimer(48 * 60 * 60);
+                hideModal();
+                showModal("Success", "Your number has been changed!", true);
+            } catch (error) {
+                console.error("Error changing number:", error);
+                showModal("Error", "Failed to change number. See console.", true);
+            }
+        });
+
+        // Add a contact
+        addContactBtn.addEventListener('click', async () => {
+            const contactNumber = addContactInput.value.trim();
+            if (contactNumber.length !== 16 || isNaN(contactNumber)) {
+                showModal("Invalid Number", "Please enter a valid 16-digit number.", true);
+                return;
+            }
+            if (contactNumber === myPhoneNumber) {
+                showModal("Whoops", "You can't add yourself as a contact!", true);
+                return;
+            }
+
+            // Find the user with this number
+            showModal("Adding Contact", "Searching for the user...");
+            try {
+                const q = query(collection(db, `artifacts/${appId}/users`), where("phoneNumber", "==", contactNumber));
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                    showModal("Not Found", "No user found with that number. Please check the number and try again.", true);
+                    return;
+                }
+                const contactData = querySnapshot.docs[0].data();
+                const contactId = contactData.userId;
+
+                // Add to my contacts
+                const contactDocRef = doc(db, `artifacts/${appId}/users/${userId}/contacts`, contactId);
+                await setDoc(contactDocRef, {
+                    name: `Contact (${contactNumber})`,
+                    phoneNumber: contactNumber,
+                    contactId: contactId,
+                    addedAt: serverTimestamp(),
+                });
+
+                addContactInput.value = '';
+                hideModal();
+                showModal("Success", `Contact with number ${contactNumber} added!`, true);
+            } catch (error) {
+                console.error("Error adding contact:", error);
+                showModal("Error", "Failed to add contact. See console.", true);
+            }
+        });
+
+        // Start a conversation
+        function startChat(contact) {
+            if (unsubscribeFromMessages) {
+                unsubscribeFromMessages();
+            }
+
+            currentChatContact = contact;
+            welcomeMessageElem.classList.add('hidden');
+            messagesContainer.classList.remove('hidden');
+            chatHeader.classList.remove('hidden');
+            messageInputArea.classList.remove('hidden');
+
+            chatWithNameElem.textContent = contact.name;
+            chatWithNumberElem.textContent = contact.phoneNumber;
+            messagesContainer.innerHTML = ''; // Clear previous messages
+
+            const chatRoomId = [userId, contact.contactId].sort().join('_');
+            const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/chats/${chatRoomId}/messages`);
+            
+            // Listen for new messages in real-time
+            unsubscribeFromMessages = onSnapshot(messagesCollectionRef, (snapshot) => {
+                const messageDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Sort messages by timestamp
+                messageDocs.sort((a, b) => a.timestamp.toDate() - b.timestamp.toDate());
+                
+                messagesContainer.innerHTML = '';
+                messageDocs.forEach(msg => {
+                    const isSent = msg.senderId === userId;
+                    const bubbleClass = isSent ? 'chat-bubble-sent' : 'chat-bubble-received';
+                    const alignmentClass = isSent ? 'self-end' : 'self-start';
+                    const bubble = `
+                        <div class="flex flex-col max-w-xs sm:max-w-md rounded-xl p-3 shadow-md ${alignmentClass} ${bubbleClass}">
+                            <p class="text-sm break-words">${msg.text}</p>
+                            <span class="text-xs mt-1 opacity-75">${new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    `;
+                    messagesContainer.innerHTML += bubble;
+                });
+                messagesContainer.scrollTop = messagesContainer.scrollHeight; // Auto-scroll to bottom
+            }, (error) => {
+                console.error("Error listening to messages:", error);
+                showModal("Error", "Failed to load chat messages.", true);
+            });
+        }
+
+        // Send a message
+        sendBtn.addEventListener('click', async () => {
+            const message = messageInput.value.trim();
+            if (!message || !currentChatContact) return;
+
+            const chatRoomId = [userId, currentChatContact.contactId].sort().join('_');
+            const messagesCollectionRef = collection(db, `artifacts/${appId}/public/data/chats/${chatRoomId}/messages`);
+
+            try {
+                await addDoc(messagesCollectionRef, {
+                    text: message,
+                    senderId: userId,
+                    timestamp: serverTimestamp(),
+                });
+                messageInput.value = '';
+            } catch (error) {
+                console.error("Error sending message:", error);
+                showModal("Error", "Failed to send message.", true);
+            }
+        });
+
+        // Event listener for Enter key on message input
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Prevents new line
+                sendBtn.click();
+            }
+        });
+
+        // --- Main App Initialization ---
+        async function initializeAppAndAuth() {
+            showModal("Initializing...", "Setting up Firebase and authenticating user.");
+            try {
+                setLogLevel('debug');
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Wait for auth state to be ready
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        myProfileDocRef = doc(db, `artifacts/${appId}/users/${userId}/profile`, 'myProfile');
+                        userIdElem.textContent = userId;
+
+                        // Get or create the user's phone number
+                        await getOrCreatePhoneNumber();
+                        
+                        // Listen for contacts in real-time
+                        const contactsCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/contacts`);
+                        onSnapshot(contactsCollectionRef, (snapshot) => {
+                            contactsListElem.innerHTML = '';
+                            if (snapshot.empty) {
+                                contactsListElem.innerHTML = '<p class="text-gray-500 text-sm">No contacts yet. Add someone!</p>';
+                                return;
+                            }
+                            snapshot.forEach(contactDoc => {
+                                const contact = contactDoc.data();
+                                const contactItem = document.createElement('div');
+                                contactItem.className = "flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer";
+                                contactItem.innerHTML = `
+                                    <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">${contact.name.charAt(0)}</div>
+                                    <div>
+                                        <p class="font-medium text-gray-800">${contact.name}</p>
+                                        <p class="text-xs text-gray-500">${contact.phoneNumber}</p>
+                                    </div>
+                                `;
+                                contactItem.addEventListener('click', () => startChat(contact));
+                                contactsListElem.appendChild(contactItem);
+                            });
+                        }, (error) => {
+                            console.error("Error listening to contacts:", error);
+                            showModal("Error", "Failed to load contacts.", true);
+                        });
+                    } else {
+                        // Not authenticated, sign in
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization or authentication failed:", error);
+                showModal("Error", "Failed to connect to the messaging service. Please check the console for details.", true);
+            }
+        }
+
+        // Run the main initialization function
+        initializeAppAndAuth();
+    </script>
+</body>
+</html>
