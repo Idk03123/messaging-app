@@ -1,81 +1,744 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Messaging App</title>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #f0f0f0; }
-    #chat { border: 1px solid #ccc; padding: 10px; height: 300px; width: 350px; margin: 10px auto; overflow-y: auto; background: white; }
-    input, button { margin: 5px; padding: 8px; width: 300px; }
-    #toCode { width: 200px; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Advanced Messaging App (Fixed Group Bug)</title>
+<style>
+body { margin:0; font-family:"Segoe UI",sans-serif; background-color:#36393f; color:#dcddde; display:flex; height:100vh; transition: background 0.3s, color 0.3s; }
+#friendsSection { width:300px; background:#2f3136; display:flex; flex-direction:column; padding:12px; box-sizing:border-box; transition: background 0.3s, color 0.3s; }
+#friendsSection h3,#friendsSection h4{ margin:6px 0; font-weight:600; font-size:14px; color:#b9bbbe }
+#userIdDisplay{ color:#b9bbbe; font-weight:700; }
+#friendIdInput{ padding:8px; margin-bottom:6px; border-radius:6px; border:none; width:100%; box-sizing:border-box; background:#40444b; color:#dcddde }
+#friendsList{ flex:1; overflow-y:auto; margin-top:10px; }
+.sectionLabel{ margin-top:10px; margin-bottom:6px; color:#b9bbbe; font-size:13px; }
+.friend{ padding:9px; margin-bottom:8px; border-radius:8px; cursor:pointer; display:flex; align-items:center; transition:background 0.15s; position:relative; background:transparent; }
+.friend:hover{ background-color:#40444b; }
+.friend-avatar, .friend-pfp{ width:38px; height:38px; border-radius:50%; margin-right:10px; flex-shrink:0; color:white; display:flex; align-items:center; justify-content:center; font-weight:bold; object-fit:cover; background:#7289da }
+.notification-dot{ width:10px; height:10px; background:red; border-radius:50%; position:absolute; right:12px; top:14px; display:none; border:2px solid #2f3136 }
+#chat{ flex:1; display:flex; flex-direction:column; background:#36393f; position:relative; transition: background 0.3s, color 0.3s; }
+#chatHeader{ padding:12px; background:#2f3136; font-weight:700; border-bottom:1px solid #202225; color:#dcddde }
+#messages{ flex:1; padding:14px; overflow-y:auto; display:flex; flex-direction:column; gap:8px }
+.message{ max-width:72%; padding:10px 12px; border-radius:10px; display:flex; gap:10px; align-items:flex-start; word-wrap:break-word }
+.message-content{ display:flex; flex-direction:column; }
+.timestamp{ font-size:11px; color:#b9bbbe; margin-top:6px; align-self:flex-end }
+.self{ background:#5865f2; color:#fff; align-self:flex-end; flex-direction:row-reverse }
+.other{ background:#4f545c; color:#fff; align-self:flex-start }
+.message-pfp{ width:38px; height:38px; border-radius:50%; object-fit:cover; }
+#typingIndicator{ font-size:13px; color:#b9bbbe; padding-left:14px; margin-bottom:6px; min-height:18px }
+#input-area{ display:flex; border-top:1px solid #202225; background:#40444b; padding:10px; gap:8px; align-items:center }
+#input-area input{ flex:1; padding:10px; border:none; border-radius:6px; background:#2f3136; color:#dcddde; font-size:15px }
+#input-area button{ padding:8px 12px; background:#7289da; border:none; border-radius:6px; color:white; cursor:pointer; }
+#auth{ position:absolute; width:100%; height:100%; background:#36393f; display:flex; justify-content:center; align-items:center; z-index:400; }
+#auth div{ background:#2f3136; padding:26px; border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,0.6); width:320px; }
+#auth input{ width:100%; padding:10px; margin-bottom:10px; border-radius:6px; border:none; background:#40444b; color:#dcddde }
+#auth button{ width:100%; padding:10px; border:none; border-radius:6px; margin-bottom:6px; cursor:pointer; background:#7289da; color:white }
+.reactions{ display:flex; gap:6px; margin-top:6px; flex-wrap:wrap }
+.reaction{ background:#2f3136; color:#fff; padding:4px 8px; border-radius:8px; font-size:13px; display:flex; gap:6px; align-items:center; }
+#emojiPicker{ display:none; position:absolute; bottom:72px; left:340px; width:320px; max-height:220px; overflow-y:auto; background:#2f3136; border:1px solid #202225; border-radius:8px; padding:10px; z-index:450; box-shadow:0 10px 30px rgba(0,0,0,0.6); display:flex; flex-wrap:wrap; gap:6px }
+.page-notification{ position:absolute; top:10px; right:10px; background:#7289da; color:#fff; padding:10px 15px; border-radius:8px; opacity:0.98; z-index:600; transition:opacity 0.3s; display:none }
+#settingsPanel{ position:absolute; top:70px; right:24px; background:#2f3136; padding:16px; border-radius:10px; display:none; z-index:600; width:320px; box-shadow:0 10px 30px rgba(0,0,0,0.6) }
+#settingsPanel input[type=file]{ display:block; margin-bottom:10px; }
+#groupChatPanel{ position:absolute; top:70px; left:24px; background:#2f3136; padding:16px; border-radius:10px; display:none; z-index:600; width:320px; box-shadow:0 10px 30px rgba(0,0,0,0.6) }
+.light-mode{ background:#f2f3f5; color:#2c2f33 }
+.light-mode #friendsSection{ background:#fff; color:#2c2f33 }
+.light-mode #chat{ background:#e8eaed; color:#2c2f33 }
+.light-mode .self{ background:#4f8cfb; color:white }
+.light-mode .other{ background:#d1d5db; color:black }
+.small-btn{ padding:6px 8px; border-radius:6px; background:#5865f2; border:none; color:white; cursor:pointer }
+.group-avatar{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:10px; background:#6b7280 }
+</style>
 </head>
 <body>
-  <h1>Mini Messenger</h1>
-  <p>Your Code: <span id="myCode"></span></p>
 
-  <input id="toCode" placeholder="Friend's code"><br>
-  <div id="chat"></div>
-  <input id="message" placeholder="Type a message">
-  <button onclick="sendMessage()">Send</button>
+<!-- AUTH -->
+<div id="auth">
+  <div>
+    <h2 style="margin:0 0 12px 0; color:#fff">Create or Login</h2>
+    <input id="usernameInput" placeholder="Username" />
+    <input id="passwordInput" type="password" placeholder="Password" />
+    <button onclick="createAccount()">Create Account</button>
+    <button onclick="login()">Login</button>
+  </div>
+</div>
 
-  <script type="module">
-    // Firebase imports
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+<!-- SIDEBAR -->
+<div id="friendsSection">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+    <div>
+      <div style="font-size:12px;color:#b9bbbe">Your ID</div>
+      <div id="userIdDisplay">—</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center">
+      <button class="small-btn" onclick="toggleGroupPanel()">👥 Group</button>
+      <button class="small-btn" onclick="toggleSettings()">⚙️</button>
+    </div>
+  </div>
 
-    // Your Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyCq58xU0o-PLkYD3r0Th-bRuxcz5aAjBOE",
-      authDomain: "messaging-app-f1037.firebaseapp.com",
-      databaseURL: "https://messaging-app-f1037-default-rtdb.firebaseio.com",
-      projectId: "messaging-app-f1037",
-      storageBucket: "messaging-app-f1037.appspot.com",
-      messagingSenderId: "1029210287915",
-      appId: "1:1029210287915:web:b1625929f6ac4bd520df6e"
+  <div style="margin-top:10px">
+    <div class="sectionLabel">Groups</div>
+    <div id="groupsList"></div>
+  </div>
+
+  <div style="margin-top:10px">
+    <div class="sectionLabel">Friends</div>
+    <input id="friendIdInput" placeholder="Add friend by 8-digit ID" />
+    <button onclick="addFriend()" style="width:100%; margin-top:6px" class="small-btn">Add Friend</button>
+    <div id="friendsList" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div id="chat">
+  <div id="chatHeader">Chat with <span id="chatFriend">—</span></div>
+  <div id="messages"></div>
+  <div id="typingIndicator"></div>
+
+  <div id="input-area">
+    <button onclick="toggleEmojiPicker()" style="background:#5865f2;border:none;color:white;font-size:18px;border-radius:6px">😊</button>
+    <input id="messageInput" placeholder="Type a message..." oninput="typing()" />
+    <button onclick="sendMessage()" style="background:#2ecc71;border:none;border-radius:6px;color:white;padding:8px 14px">Send</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settingsPanel">
+  <h3 style="margin:0 0 8px 0">Settings</h3>
+  <input id="newUsername" placeholder="New username" />
+  <input id="newPfp" type="file" accept="image/*" />
+  <button onclick="updateSettings()" style="width:100%; margin-top:6px" class="small-btn">Save Changes</button>
+  <button onclick="toggleDarkMode()" style="width:100%; margin-top:6px" class="small-btn">Toggle Dark Mode</button>
+</div>
+
+<!-- GROUP PANEL -->
+<div id="groupChatPanel">
+  <h3 style="margin:0 0 8px 0">Create Group Chat</h3>
+  <input id="groupName" placeholder="Group name" />
+  <div id="groupFriendsList" style="margin-top:10px; max-height:160px; overflow:auto"></div>
+  <button onclick="createGroup()" style="width:100%; margin-top:8px" class="small-btn">Create Group</button>
+</div>
+
+<!-- EMOJI PICKER & PAGE NOTIF -->
+<div id="emojiPicker"></div>
+<div id="notification" class="page-notification"></div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+
+<script>
+// ---------- Firebase config ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyBRsCYfrXge2VNF-bjIijK91dYEZ8IYxIk",
+  authDomain: "pj-s-messaging.firebaseapp.com",
+  databaseURL: "https://pj-s-messaging-default-rtdb.firebaseio.com",
+  projectId: "pj-s-messaging",
+  storageBucket: "pj-s-messaging.firebasestorage.app",
+  messagingSenderId: "294344428209",
+  appId: "1:294344428209:web:624a2c618590f843b07090"
+};
+const app = firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ---------- App state ----------
+let username = "", password = "", userId = "", pfpURL = "";
+let currentFriend = null;          // friend id when private chat open
+let currentGroupKey = null;        // group key when group chat open
+let currentChatType = null;        // 'private' or 'group'
+let typingTimeout = null;
+const friendNotifications = {};    // fid -> bool
+const groupNotifications = {};     // groupKey -> bool
+
+// Emoji list (trimmed but plenty)
+const emojiList = ["😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😍","😘","😋","😛","😜","🤪","🤓","😎","🥳","😏","😒","😞","😔","😕","🙁","😣","😖","😫","😩","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🤭","🤫","😶","😐","😑","😬","🙄","😯","😦","😮","😲","🥱","😴","🤤","🤮","🤧","😷","🤒","🤕","🤑","🤠","😈","👿","👹","👺","💀","👻","👽","👾","🤖"];
+
+// ---------- Helpers ----------
+function getColor(str){
+  let hash = 0;
+  for (let i=0;i<str.length;i++) hash = str.charCodeAt(i) + ((hash<<5)-hash);
+  const c = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+  return "#" + ("00000"+c).slice(-6);
+}
+function generateId(){ return Math.floor(10000000 + Math.random()*90000000).toString(); }
+function showNotification(msg){
+  const n = document.getElementById('notification');
+  n.textContent = msg; n.style.display='block';
+  setTimeout(()=> n.style.display='none', 2800);
+}
+
+// ---------- Account (create/login) ----------
+function createAccount(){
+  const uname = document.getElementById('usernameInput').value.trim();
+  const pass = document.getElementById('passwordInput').value.trim();
+  if(!uname || !pass) return alert("Enter username and password");
+  userId = generateId(); username = uname; password = pass;
+  db.ref('users/'+userId).set({ username, password, friends: {}, pfp: "" })
+    .then(()=> {
+      alert("Account created! Your ID: " + userId);
+      showFriendsSection();
+      loadUserPfp();
+      loadGroups(); loadFriends();
+    })
+    .catch(err => alert("Error creating account: "+err));
+}
+
+function login(){
+  const uname = document.getElementById('usernameInput').value.trim();
+  const pass = document.getElementById('passwordInput').value.trim();
+  if(!uname || !pass) return alert("Enter username and password");
+  db.ref('users').once('value', snap => {
+    const users = snap.val()||{};
+    let found = false;
+    for(const uid in users){
+      if(users[uid].username === uname && users[uid].password === pass){
+        userId = uid; username = uname; password = pass; found = true; break;
+      }
+    }
+    if(!found) return alert("User not found or incorrect password");
+    showFriendsSection();
+    loadUserPfp();
+    loadGroups(); loadFriends();
+  });
+}
+
+function showFriendsSection(){
+  document.getElementById('auth').style.display='none';
+  document.getElementById('friendsSection').style.display='flex';
+  document.getElementById('userIdDisplay').textContent = userId;
+  // load friends/groups
+  loadFriends(); loadGroups();
+}
+
+// ---------- PFP / settings ----------
+function loadUserPfp(){
+  db.ref('users/'+userId+'/pfp').once('value', snap => {
+    pfpURL = snap.val() || "";
+  });
+}
+function toggleSettings(){ const s = document.getElementById('settingsPanel'); s.style.display = (s.style.display==='block'?'none':'block'); }
+function updateSettings(){
+  const newName = document.getElementById('newUsername').value.trim();
+  const file = document.getElementById('newPfp').files[0];
+  if(newName){
+    username = newName;
+    db.ref('users/'+userId+'/username').set(username);
+    // update friends lists displays
+    loadFriends();
+    if(currentChatType==='private' && currentFriend===userId) document.getElementById('chatFriend').textContent = username;
+  }
+  if(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      pfpURL = e.target.result;
+      db.ref('users/'+userId+'/pfp').set(pfpURL).then(()=>{
+        loadFriends();
+        loadMessages(); // refresh displayed messages so PFPs show
+      });
     };
+    reader.readAsDataURL(file);
+  }
+  toggleSettings();
+}
 
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+// ---------- Friends ----------
+function addFriend(){
+  const friendId = document.getElementById('friendIdInput').value.trim();
+  if(!friendId) return;
+  if(friendId === userId) return alert("Cannot add yourself");
+  db.ref('users/'+friendId+'/username').once('value', snap => {
+    if(!snap.exists()) return alert("User not found");
+    const friendName = snap.val();
+    db.ref('users/'+userId+'/friends/'+friendId).set(friendName);
+    db.ref('users/'+friendId+'/friends/'+userId).set(username);
+    showNotification(friendName + " added!");
+    loadFriends();
+  });
+}
 
-    // Generate 16-digit code
-    const myCode = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
-    document.getElementById("myCode").innerText = myCode;
+function loadFriends(){
+  const friendsDiv = document.getElementById('friendsList');
+  friendsDiv.innerHTML = "";
+  db.ref('users/'+userId+'/friends').on('value', snap => {
+    friendsDiv.innerHTML = "";
+    const friends = snap.val() || {};
+    for(const fid in friends){
+      // create friend row
+      const div = document.createElement('div'); div.className = 'friend';
+      // query friend's pfp
+      db.ref('users/'+fid).once('value', uSnap => {
+        const u = uSnap.val() || {};
+        const fName = friends[fid];
+        const fPfp = u.pfp || "";
+        let avatarHTML = "";
+        if(fPfp){
+          avatarHTML = `<img src="${fPfp}" class="friend-pfp" onerror="this.style.display='none'">`;
+        } else {
+          const color = getColor(fid);
+          const initial = (fName && fName[0])? fName[0].toUpperCase() : '?';
+          avatarHTML = `<div class="friend-avatar" style="background:${color}">${initial}</div>`;
+        }
+        div.innerHTML = avatarHTML + `<div style="flex:1">${fName} <div style="font-size:11px;color:#9aa0a6">(${fid})</div></div><div class='notification-dot' id='notif_${fid}'></div>`;
+      });
+      div.onclick = ()=> openPrivateChat(fid, friends[fid]);
+      friendsDiv.appendChild(div);
+      friendNotifications[fid] = false;
+    }
+  });
+}
 
-    const chatBox = document.getElementById("chat");
+// ---------- Groups: create / list ----------
+function toggleGroupPanel(){ const p=document.getElementById('groupChatPanel'); p.style.display = (p.style.display==='block'?'none':'block'); if(p.style.display === 'block') loadGroupFriends(); }
+function loadGroupFriends(){
+  const div = document.getElementById('groupFriendsList'); div.innerHTML = "";
+  db.ref('users/'+userId+'/friends').once('value', snap=>{
+    const friends = snap.val() || {};
+    for(const fid in friends){
+      const row = document.createElement('div');
+      row.style.marginBottom = '6px';
+      row.innerHTML = `<input type="checkbox" id="grp_${fid}" value="${fid}"> <label for="grp_${fid}" style="margin-left:6px;color:#fff">${friends[fid]}</label>`;
+      div.appendChild(row);
+    }
+  });
+}
 
-    // Listen for messages sent to me
-    onChildAdded(ref(db, "messages"), (snapshot) => {
-      const msg = snapshot.val();
-      if (msg.to === myCode) {
-        let p = document.createElement("p");
-        p.textContent = "Friend: " + msg.text;
-        chatBox.appendChild(p);
-        chatBox.scrollTop = chatBox.scrollHeight;
+// createGroup: store group info and open it immediately
+function createGroup(){
+  const name = document.getElementById('groupName').value.trim();
+  if(!name) return alert("Enter group name");
+  const memberIds = [];
+  document.querySelectorAll('#groupFriendsList input[type=checkbox]').forEach(cb => { if(cb.checked) memberIds.push(cb.value); });
+  // include creator even if not selected
+  if(!memberIds.includes(userId)) memberIds.push(userId);
+  const groupKey = 'group_' + Date.now();
+  const groupData = { name, members: memberIds, createdBy: userId, createdAt: Date.now() };
+  db.ref('groups/'+groupKey).set(groupData).then(()=>{
+    showNotification("Group created: " + name);
+    // load groups and open the new group chat
+    loadGroups(() => { openGroupChat(groupKey, name); });
+    toggleGroupPanel();
+    document.getElementById('groupName').value = "";
+  }).catch(err => alert("Error creating group: "+err));
+}
+
+// loadGroups: list groups where user is a member
+function loadGroups(callback){
+  const groupsDiv = document.getElementById('groupsList');
+  groupsDiv.innerHTML = "";
+  db.ref('groups').on('value', snap=>{
+    groupsDiv.innerHTML = "";
+    const groups = snap.val() || {};
+    for(const gk in groups){
+      const g = groups[gk];
+      if(!g.members || !Array.isArray(g.members)) continue;
+      if(g.members.indexOf(userId) !== -1){
+        const div = document.createElement('div'); div.className='friend';
+        const color = getColor(gk);
+        const initial = (g.name && g.name[0]) ? g.name[0].toUpperCase() : 'G';
+        div.innerHTML = `<div class="group-avatar" style="background:${color}">${initial}</div><div style="flex:1">${g.name} <div style="font-size:11px;color:#9aa0a6">(${g.members.length} members)</div></div><div class='notification-dot' id='group_notif_${gk}'></div>`;
+        div.onclick = ()=> openGroupChat(gk, g.name);
+        groupsDiv.appendChild(div);
+        groupNotifications[gk] = false;
+      }
+    }
+    if(callback) callback();
+  });
+}
+
+// ---------- Open chats ----------
+function openPrivateChat(friendId, friendName){
+  currentChatType = 'private';
+  currentGroupKey = null;
+  currentFriend = friendId;
+  document.getElementById('chatFriend').textContent = friendName;
+  document.getElementById('chat').style.display = 'flex';
+  // hide notification dot
+  const nd = document.getElementById('notif_'+friendId);
+  if(nd) nd.style.display = 'none';
+  friendNotifications[friendId] = false;
+  loadMessages(); // loads based on currentChatType / currentFriend / currentGroupKey
+}
+
+function openGroupChat(groupKey, groupName){
+  currentChatType = 'group';
+  currentGroupKey = groupKey;
+  currentFriend = null;
+  document.getElementById('chatFriend').textContent = groupName;
+  document.getElementById('chat').style.display = 'flex';
+  // hide group notification dot
+  const gd = document.getElementById('group_notif_'+groupKey);
+  if(gd) gd.style.display='none';
+  groupNotifications[groupKey] = false;
+  loadMessages();
+}
+
+// ---------- Send message (private or group) ----------
+function sendMessage(){
+  const msgInput = document.getElementById('messageInput');
+  const message = msgInput.value.trim();
+  if(!message) return;
+  if(currentChatType === 'private' && !currentFriend) return alert("Open a friend chat first");
+  if(currentChatType === 'group' && !currentGroupKey) return alert("Open a group chat first");
+  const payload = { sender: userId, message, timestamp: Date.now(), pfp: pfpURL || "" };
+  if(currentChatType === 'private'){
+    const chatKey = [userId, currentFriend].sort().join('_');
+    db.ref('privateMessages/'+chatKey).push(payload);
+  } else { // group
+    db.ref('groups/'+currentGroupKey+'/messages').push(payload);
+  }
+  msgInput.value = '';
+}
+
+// ---------- Load messages (works for private & group) ----------
+let lastPrivateListener = null;
+let lastGroupListener = null;
+
+function clearMessageListeners(){
+  // detach prior listeners (if any) to avoid duplicate events
+  if(lastPrivateListener) db.ref(lastPrivateListener).off();
+  if(lastGroupListener) db.ref(lastGroupListener).off();
+  lastPrivateListener = null;
+  lastGroupListener = null;
+}
+
+function loadMessages(){
+  const messagesDiv = document.getElementById('messages');
+  const typingDiv = document.getElementById('typingIndicator');
+  messagesDiv.innerHTML = "";
+  typingDiv.textContent = "";
+  // remove previous listeners
+  clearMessageListeners();
+
+  if(currentChatType === 'private'){
+    if(!currentFriend) return;
+    const chatKey = [userId, currentFriend].sort().join('_');
+    lastPrivateListener = 'privateMessages/' + chatKey;
+    const ref = db.ref('privateMessages/'+chatKey);
+    ref.on('child_added', snap => {
+      const data = snap.val(); const msgId = snap.key;
+      const div = document.createElement('div');
+      div.className = 'message ' + (data.sender === userId ? 'self' : 'other');
+      // pfp or fallback
+      let leftAvatar = "";
+      if(data.pfp){
+        leftAvatar = `<img src="${data.pfp}" class="message-pfp" onerror="this.style.display='none'">`;
+      } else {
+        const senderName = (data.sender === userId) ? username : (document.getElementById('chatFriend').textContent || '?');
+        const initial = (senderName && senderName[0]) ? senderName[0].toUpperCase() : '?';
+        leftAvatar = `<div class="friend-avatar" style="background:${getColor(data.sender)}">${initial}</div>`;
+      }
+      const time = new Date(data.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      // reactions container id unique per message
+      div.innerHTML = `${leftAvatar}<div class="message-content">${escapeHtml(data.message)}<div class="timestamp">${time}</div><div class="reactions" id="reactions_${msgId}"></div><button onclick="showMessageEmojiPicker('${chatKey}','${msgId}',this,false)" style="margin-top:6px" class="small-btn">React</button></div>`;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      // reactions live listener
+      db.ref('privateMessages/'+chatKey+'/'+msgId+'/reactions').on('value', rSnap => {
+        const rDiv = document.getElementById('reactions_'+msgId);
+        if(!rDiv) return;
+        rDiv.innerHTML = "";
+        const reactions = rSnap.val() || {};
+        for(const emoji in reactions){
+          const count = Object.keys(reactions[emoji]).length;
+          const el = document.createElement('div'); el.className='reaction';
+          el.innerHTML = `<span>${emoji}</span><span style="margin-left:6px">${count}</span>`;
+          rDiv.appendChild(el);
+        }
+      });
+
+      // notification dot for friend if not currently open
+      if(data.sender !== userId && currentFriend !== snap.ref.parent.key.split('_').filter(id=>id!==userId)[0]){
+        const fid = snap.ref.parent.key.split('_').filter(id=>id!==userId)[0];
+        const nd = document.getElementById('notif_'+fid);
+        if(nd) nd.style.display = 'block';
+        friendNotifications[fid] = true;
       }
     });
 
-    // Send a message
-    window.sendMessage = function() {
-      const toCode = document.getElementById("toCode").value.trim();
-      const text = document.getElementById("message").value.trim();
-      if (!toCode || !text) return alert("Enter friend's code and a message.");
+    // typing indicator: watch typing flags in private chat
+    db.ref('typing/'+chatKey).on('value', tSnap => {
+      const typingFlags = tSnap.val() || {};
+      let someone = null;
+      for(const uid in typingFlags){
+        if(uid !== userId && typingFlags[uid]) { someone = uid; break; }
+      }
+      if(someone){
+        // attempt to show username if available
+        db.ref('users/'+someone+'/username').once('value', uSnap=>{
+          const n = uSnap.val() || "Someone";
+          typingDiv.textContent = n + " is typing...";
+        });
+      } else typingDiv.textContent = "";
+    });
 
-      // Push to Firebase
-      push(ref(db, "messages"), {
-        from: myCode,
-        to: toCode,
-        text: text
+  } else if(currentChatType === 'group'){
+    if(!currentGroupKey) return;
+    const ref = db.ref('groups/'+currentGroupKey+'/messages');
+    lastGroupListener = 'groups/' + currentGroupKey + '/messages';
+    ref.on('child_added', snap => {
+      const data = snap.val(); const msgId = snap.key;
+      const div = document.createElement('div');
+      div.className = 'message ' + (data.sender === userId ? 'self' : 'other');
+      // pfp or fallback initial
+      let avatarHTML = "";
+      if(data.pfp){
+        avatarHTML = `<img src="${data.pfp}" class="message-pfp" onerror="this.style.display='none'">`;
+      } else {
+        // try to find sender name
+        avatarHTML = `<div class="friend-avatar" style="background:${getColor(data.sender)}">${(data.sender && data.sender[0])?data.sender[0].toUpperCase():'?'}</div>`;
+      }
+      const time = new Date(data.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      div.innerHTML = `${avatarHTML}<div class="message-content">${escapeHtml(data.message)}<div class="timestamp">${time}</div><div class="reactions" id="reactions_group_${msgId}"></div><button onclick="showMessageEmojiPicker('${currentGroupKey}','${msgId}',this,true)" style="margin-top:6px" class="small-btn">React</button></div>`;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      // reactions listener for group message
+      db.ref('groups/'+currentGroupKey+'/messages/'+msgId+'/reactions').on('value', rSnap => {
+        const rDiv = document.getElementById('reactions_group_'+msgId);
+        if(!rDiv) return;
+        rDiv.innerHTML = "";
+        const reactions = rSnap.val() || {};
+        for(const emoji in reactions){
+          const count = Object.keys(reactions[emoji]).length;
+          const el = document.createElement('div'); el.className='reaction';
+          el.innerHTML = `<span>${emoji}</span><span style="margin-left:6px">${count}</span>`;
+          rDiv.appendChild(el);
+        }
       });
 
-      // Show locally
-      let p = document.createElement("p");
-      p.textContent = "Me: " + text;
-      chatBox.appendChild(p);
-      chatBox.scrollTop = chatBox.scrollHeight;
+      // group notification dot if not open
+      if(data.sender !== userId){
+        // if currentGroupKey isn't this group's key, show group notif
+        // but this listener is for current open group; to set notification for groups we attach separate listener below
+      }
+    });
 
-      document.getElementById("message").value = "";
-    };
-  </script>
+    // typing indicator for group: show first other user typing
+    db.ref('groups/'+currentGroupKey+'/typing').on('value', tSnap => {
+      const flags = tSnap.val() || {};
+      let someone = null;
+      for(const uid in flags){
+        if(uid !== userId && flags[uid]) { someone = uid; break; }
+      }
+      if(someone){
+        db.ref('users/'+someone+'/username').once('value', uSnap=>{
+          typingDiv.textContent = (uSnap.val()||'Someone') + " is typing...";
+        });
+      } else typingDiv.textContent = "";
+    });
+  }
+}
+
+// ---------- Typing (set flags for private or group) ----------
+function typing(){
+  if(currentChatType === 'private'){
+    if(!currentFriend) return;
+    const chatKey = [userId, currentFriend].sort().join('_');
+    db.ref('typing/'+chatKey+'/'+userId).set(true);
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(()=> db.ref('typing/'+chatKey+'/'+userId).set(false), 900);
+  } else if(currentChatType === 'group'){
+    if(!currentGroupKey) return;
+    db.ref('groups/'+currentGroupKey+'/typing/'+userId).set(true);
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(()=> db.ref('groups/'+currentGroupKey+'/typing/'+userId).set(false), 900);
+  }
+}
+
+// ---------- Emoji picker (insert to input) ----------
+function toggleEmojiPicker(){
+  const p = document.getElementById('emojiPicker');
+  p.style.display = (p.style.display==='flex'?'none':'flex');
+  if(p.style.display==='flex') renderEmojiPicker();
+}
+function renderEmojiPicker(){
+  const p = document.getElementById('emojiPicker');
+  p.innerHTML = '';
+  emojiList.forEach(e => {
+    const b = document.createElement('button');
+    b.style.fontSize='20px'; b.style.padding='6px'; b.style.border='none'; b.style.background='transparent'; b.style.cursor='pointer'; b.textContent = e;
+    b.onclick = ()=> { document.getElementById('messageInput').value += e; document.getElementById('messageInput').focus(); };
+    p.appendChild(b);
+  });
+}
+
+// ---------- Message reactions (support private & group) ----------
+function showMessageEmojiPicker(chatKey, msgId, btn, isGroup){
+  let picker = document.getElementById('messageEmojiPicker');
+  if(!picker){
+    picker = document.createElement('div');
+    picker.id = 'messageEmojiPicker';
+    picker.style.position='absolute';
+    picker.style.background='#2f3136';
+    picker.style.border='1px solid #202225';
+    picker.style.borderRadius='8px';
+    picker.style.padding='10px';
+    picker.style.display='flex';
+    picker.style.flexWrap='wrap';
+    picker.style.maxWidth='220px';
+    picker.style.maxHeight='220px';
+    picker.style.overflowY='auto';
+    picker.style.zIndex='999';
+    document.body.appendChild(picker);
+  }
+  picker.innerHTML = '';
+  // position above button
+  const rect = btn.getBoundingClientRect();
+  picker.style.left = rect.left + 'px';
+  picker.style.top = (rect.top - 230) + 'px';
+  picker.style.display = 'flex';
+  emojiList.forEach(e => {
+    const b = document.createElement('button');
+    b.textContent = e;
+    b.style.fontSize='20px'; b.style.margin='4px'; b.style.background='transparent'; b.style.border='none'; b.style.cursor='pointer';
+    b.onclick = ()=> { addReaction(chatKey, msgId, e, isGroup); picker.style.display='none'; };
+    picker.appendChild(b);
+  });
+}
+
+function addReaction(chatKey, msgId, emoji, isGroup){
+  // isGroup true => path groups/{chatKey}/messages/{msgId}/reactions/{emoji}/{userId}
+  if(isGroup){
+    const ref = db.ref('groups/'+chatKey+'/messages/'+msgId+'/reactions/'+encodeKey(emoji)+'/'+userId);
+    ref.once('value', s => { if(s.exists()) ref.remove(); else ref.set(true); });
+  } else {
+    const ref = db.ref('privateMessages/'+chatKey+'/'+msgId+'/reactions/'+encodeKey(emoji)+'/'+userId);
+    ref.once('value', s => { if(s.exists()) ref.remove(); else ref.set(true); });
+  }
+}
+function encodeKey(k){ return encodeURIComponent(k).replace(/\./g,'%2E'); }
+
+// ---------- Notifications for groups & private chats (global listeners) ----------
+function attachGlobalNotifListeners(){
+  // Private messages: listen to child_added in privateMessages root and show notif dots appropriately
+  db.ref('privateMessages').on('child_added', snap => {
+    // child key is chatKey like "12345678_87654321"
+    const chatKey = snap.key;
+    // We only care about new pushes inside the chat; attach child_added on this chat
+    db.ref('privateMessages/'+chatKey).on('child_added', msgSnap => {
+      const data = msgSnap.val();
+      if(!data) return;
+      // determine other user id in chat
+      const participants = chatKey.split('_');
+      const other = participants.find(id => id !== userId);
+      if(!other) return;
+      // If the message sender is not me and I'm not currently viewing that private chat, show notif dot
+      if(data.sender !== userId && !(currentChatType==='private' && currentFriend === other)){
+        const nd = document.getElementById('notif_'+other);
+        if(nd) nd.style.display='block';
+        friendNotifications[other] = true;
+      }
+    });
+  });
+
+  // Groups: when a new message is pushed to any group's messages, show group notif if not open
+  db.ref('groups').on('child_added', snap => {
+    const gk = snap.key;
+    // attach child_added listener to messages path
+    db.ref('groups/'+gk+'/messages').on('child_added', msgSnap => {
+      const data = msgSnap.val();
+      if(!data) return;
+      // if I'm a member and not viewing that group, show notif
+      db.ref('groups/'+gk+'/members').once('value', mSnap => {
+        // fallback to group.members if members stored directly under group (we stored members under groups/gk/members earlier)
+      });
+      // simpler: load group data and check membership
+      db.ref('groups/'+gk).once('value', gSnap => {
+        const g = gSnap.val() || {};
+        const members = g.members || [];
+        if(members.indexOf(userId) === -1) return; // not my group
+        if(data.sender !== userId && !(currentChatType==='group' && currentGroupKey === gk)){
+          const nd = document.getElementById('group_notif_'+gk);
+          if(nd) nd.style.display='block';
+          groupNotifications[gk] = true;
+        }
+      });
+    });
+  });
+}
+
+// ---------- Utility: escape html for message content ----------
+function escapeHtml(unsafe){
+  if(!unsafe) return "";
+  return unsafe.replace(/[&<>"'`=\/]/g, function(s){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;'}[s]; });
+}
+
+// ---------- Start global listeners after login/creation ----------
+(function initGlobal(){
+  // We'll attach notif listeners after user logs in/creates account,
+  // because we need `userId` to filter. But attach a light listener to keep it available.
+})();
+
+// Expose attachGlobalNotifListeners call after login/create to begin notifications
+
+// ---------- Load initial lists after login is done (we call these in createAccount/login) ----------
+function finalizeLogin(){
+  loadFriends();
+  loadGroups();
+  loadUserPfp();
+  attachGlobalNotifListeners();
+}
+
+// We call finalizeLogin inside createAccount/login where appropriate
+// but also defend if called multiple times
+// To keep things simple, call attachGlobalNotifListeners only once by guarding:
+let notifListenersAttached = false;
+function ensureNotifAttached(){
+  if(!notifListenersAttached){
+    attachGlobalNotifListeners();
+    notifListenersAttached = true;
+  }
+}
+
+// Hook up finalize calls inside createAccount/login previously done
+// (already calling loadFriends/loadGroups there), so also call ensureNotifAttached there:
+const origCreateAccount = createAccount;
+const origLogin = login;
+// (We already defined createAccount/login earlier to call loadGroups/loadFriends etc.)
+// We'll just ensure notifications are attached after those create/login flows by modifying them:
+(function wrapAuth(){
+  const oldCreate = createAccount;
+  createAccount = function(){
+    const uname = document.getElementById('usernameInput').value.trim();
+    const pass = document.getElementById('passwordInput').value.trim();
+    if(!uname || !pass) return alert("Enter username and password");
+    userId = generateId(); username = uname; password = pass;
+    db.ref('users/'+userId).set({ username, password, friends: {}, pfp: "" })
+      .then(()=> {
+        alert("Account created! Your ID: " + userId);
+        showFriendsSection();
+        loadUserPfp();
+        loadGroups(); loadFriends();
+        ensureNotifAttached();
+      })
+      .catch(err => alert("Error creating account: "+err));
+  };
+
+  const oldLogin = login;
+  login = function(){
+    const uname = document.getElementById('usernameInput').value.trim();
+    const pass = document.getElementById('passwordInput').value.trim();
+    if(!uname || !pass) return alert("Enter username and password");
+    db.ref('users').once('value', snap => {
+      const users = snap.val()||{};
+      let found = false;
+      for(const uid in users){
+        if(users[uid].username === uname && users[uid].password === pass){
+          userId = uid; username = uname; password = pass; found = true; break;
+        }
+      }
+      if(!found) return alert("User not found or incorrect password");
+      showFriendsSection();
+      loadUserPfp();
+      loadGroups(); loadFriends();
+      ensureNotifAttached();
+    });
+  };
+})();
+
+// ---------- Initial protective listener to avoid empty UI (no-op) ----------
+document.addEventListener('DOMContentLoaded', ()=>{ /* ready */ });
+
+</script>
 </body>
 </html>
